@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-import os
 import requests
 import re
 import base64
@@ -11,6 +10,8 @@ import time
 import json
 
 from bs4 import BeautifulSoup
+
+from logger import logger
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko",
@@ -30,6 +31,10 @@ USER_AGENTS = [
 # TODO: email notification
 # TODO: random user agent
 # TODO: add logger
+# TODO: handle connection error
+# TODO: omit sock4 type
+# TODO: use crontab for scheduling
+# TODO: handle unexpected like response
 class LikeRobot(object):
 
     LIKE_URL = "http://woxue.xdf.cn/Mobile_Teacher_Home/like?u=liutingting22@xdf.cn"
@@ -40,18 +45,23 @@ class LikeRobot(object):
         self.idle = 0
 
     def _get_soup(self):
-        proxy_response = requests.get(self.url)
+        while 1:
+            try:
+                proxy_response = requests.get(self.url)
+                break
+            except requests.exceptions.ConnectionError:
+                continue
         return BeautifulSoup(proxy_response.content, "html.parser")
 
     @staticmethod
     def _get_type(type_tag, sep='/'):
-        return [t.lower() for t in type_tag.string.split(sep)]
+        return [t.lower() for t in type_tag.string.split(sep) if t != 'sock4']
 
     # TODO: handle boundary condition
     # TODO: improve generating model
     @staticmethod
     def _get_idle_time(mean=0, deviation=2.5, maximum=6):
-        return int(min(maximum, abs(random.gauss(mean, deviation)))*3600)
+        return int(min(maximum, abs(random.gauss(mean, deviation)))*1800)
 
     def _format_proxy(self):
         proxy = self.proxy_list.pop(0)
@@ -62,40 +72,37 @@ class LikeRobot(object):
 
     def _like_response(self):
         p = self._format_proxy()
-        print "Using proxy -- {0}".format(p.values()[0])
-        return requests.get(self.LIKE_URL, proxies=p, headers={'User-Agent':random.choice(USER_AGENTS)})
+        agent = random.choice(USER_AGENTS)
+        logger.info("Using proxy: {0} and user-agent: {1}".format(p.values()[0], agent))
+        return requests.get(self.LIKE_URL, proxies=p, headers={'User-Agent':agent})
 
     def _get_proxy_list(self):
         pass
 
     def get_proxy_list(self):
-        # print "Getting proxies..."
         return self._get_proxy_list()
 
     def like(self):
         while 1:
             try:
-                print "Sending LIKE request..."
                 content = self._like_response().content
                 response = json.loads(content)
 
                 if response['Status'] == 1:
-                    print "Successfully like your object!"
-                    print "Num of Like: {0}".format(response['Count'])
+                    logger.info("Successfully liked the link. Num of Like: {0}".format(response['Count']))
                 else:
-                    print "Failed to like! Response: {0}".format(content)
+                    logger.info("Failed to like. Response: {0}".format(content))
 
                 break
 
             except requests.exceptions.ConnectionError:
-                print "Connection failed! Trying another one..."
+                logger.info("Connection failed.")
                 continue
 
             except Exception:
                 raise
 
     def run(self):
-        print "Program started!"
         while 1:
             time.sleep(self.idle)
 
@@ -104,22 +111,20 @@ class LikeRobot(object):
                 self.like()
 
             except IndexError:
-                print "Run out of proxies! Try to refresh proxy list..."
                 self.idle = 0
                 continue
 
             except Exception as e:
-                print "Error -- Type: {0} ; Message: {1}".format(type(e), e)
+                logger.info("Error -- Type: {0} ; Message: {1}".format(type(e), e))
                 break
 
             self.idle = self._get_idle_time()
-            # self.idle = 5
 
             h = int(self.idle / 3600)
             m = int((self.idle % 3600) / 60)
             s = int(self.idle % 60)
 
-            print "Next action will be taken in {0}h {1}m {2}s\n\n".format(h, m, s)
+            logger.info("Next action will be taken in {0}h {1}m {2}s\n\n".format(h, m, s))
 
 
 class GoubanjiaProxy(LikeRobot):

@@ -54,7 +54,7 @@ class CompressingFileHandler(handlers.RotatingFileHandler):
 
 
 formatter = logging.Formatter(
-    fmt='[%(asctime)s] [%(levelname)s] [%(name)s]: In %(funcName)s line %(lineno)d: %(message)s',
+    fmt='[%(asctime)s] %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
