@@ -50,12 +50,13 @@ class LikeRobot(object):
                 proxy_response = requests.get(self.url)
                 break
             except requests.exceptions.ConnectionError:
+                logger.info("Get proxy website failed.")
                 continue
         return BeautifulSoup(proxy_response.content, "html.parser")
 
     @staticmethod
     def _get_type(type_tag, sep='/'):
-        return [t.lower() for t in type_tag.string.split(sep) if t != 'sock4']
+        return [t.lower() for t in type_tag.string.split(sep) if t.lower() != 'socks4']
 
     # TODO: handle boundary condition
     # TODO: improve generating model
@@ -207,5 +208,7 @@ if __name__ == '__main__':
             gbj.run()
 
     mimvp = MimvpProxy()
+    print mimvp.idle
     mimvp.run()
+    print mimvp.idle
 
