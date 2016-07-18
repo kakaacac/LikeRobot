@@ -208,7 +208,5 @@ if __name__ == '__main__':
             gbj.run()
 
     mimvp = MimvpProxy()
-    print mimvp.idle
     mimvp.run()
-    print mimvp.idle
 
