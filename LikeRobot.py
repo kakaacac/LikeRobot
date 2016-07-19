@@ -28,13 +28,8 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_6_8) AppleWebKit/537.13+ (KHTML, like Gecko) Version/5.1.7 Safari/534.57.2"
 ]
 
-# TODO: email notification
-# TODO: random user agent
-# TODO: add logger
-# TODO: handle connection error
-# TODO: omit sock4 type
+# TODO: email notification (not necessary)
 # TODO: use crontab for scheduling
-# TODO: handle unexpected like response
 class LikeRobot(object):
 
     LIKE_URL = "http://woxue.xdf.cn/Mobile_Teacher_Home/like?u=liutingting22@xdf.cn"
@@ -42,7 +37,8 @@ class LikeRobot(object):
     def __init__(self):
         self.proxy_list = None
         self.url = None
-        self.idle = 0
+        # self.idle = 0
+        self.idle =self._get_idle_time()
 
     def _get_soup(self):
         while 1:
@@ -50,7 +46,7 @@ class LikeRobot(object):
                 proxy_response = requests.get(self.url)
                 break
             except requests.exceptions.ConnectionError:
-                logger.info("Get proxy website failed.")
+                logger.info("Failed to open proxy website.")
                 continue
         return BeautifulSoup(proxy_response.content, "html.parser")
 
@@ -58,11 +54,14 @@ class LikeRobot(object):
     def _get_type(type_tag, sep='/'):
         return [t.lower() for t in type_tag.string.split(sep) if t.lower() != 'socks4']
 
-    # TODO: handle boundary condition
     # TODO: improve generating model
     @staticmethod
     def _get_idle_time(mean=0, deviation=2.5, maximum=6):
-        return int(min(maximum, abs(random.gauss(mean, deviation)))*1800)
+        guess = min(maximum, abs(random.gauss(mean, deviation)))
+        if guess == maximum or guess == 0:
+            rd = random.random()
+            guess += (-1)**int(rd*10)*rd
+        return int(guess*1800)
 
     def _format_proxy(self):
         proxy = self.proxy_list.pop(0)
@@ -83,7 +82,7 @@ class LikeRobot(object):
     def get_proxy_list(self):
         return self._get_proxy_list()
 
-    def like(self):
+    def _like(self):
         while 1:
             try:
                 content = self._like_response().content
@@ -91,29 +90,43 @@ class LikeRobot(object):
 
                 if response['Status'] == 1:
                     logger.info("Successfully liked the link. Num of Like: {0}".format(response['Count']))
+                    if response['Count'] > 10000:
+                        logger.info("Unexpected number. Respnse: {0}".format(content))
                 else:
                     logger.info("Failed to like. Response: {0}".format(content))
 
                 break
 
             except requests.exceptions.ConnectionError:
-                logger.info("Connection failed.")
+                logger.info("Failed to connect proxy.")
                 continue
 
             except Exception:
                 raise
 
-    def run(self):
+    def like(self):
+        while 1:
+            try:
+                self.proxy_list = self.get_proxy_list()
+                self._like()
+
+                break
+
+            # running out of proxies
+            except IndexError:
+                continue
+
+            except Exception:
+                raise
+
+    def run(self, init=False):
+        if init:
+            self.idle = 0
         while 1:
             time.sleep(self.idle)
 
             try:
-                self.proxy_list = self.get_proxy_list()
                 self.like()
-
-            except IndexError:
-                self.idle = 0
-                continue
 
             except Exception as e:
                 logger.info("Error -- Type: {0} ; Message: {1}".format(type(e), e))
@@ -149,7 +162,6 @@ class GoubanjiaProxy(LikeRobot):
         for i, l in enumerate(code[::-1]):
             count += (ord(l) - 65)*10**i if l != 'Z' else 9*10**i
         return str(count / 8)
-
 
     def _get_proxy_list(self):
         proxy_list = []
