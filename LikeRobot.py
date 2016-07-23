@@ -40,21 +40,22 @@ class LikeRobot(object):
         # self.idle = 0
         self.idle =self._get_idle_time()
 
-    def _get_soup(self):
-        while 1:
-            try:
-                proxy_response = requests.get(self.url)
-                break
-            except requests.exceptions.ConnectionError:
-                logger.info("Failed to open proxy website.")
-                continue
-        return BeautifulSoup(proxy_response.content, "html.parser")
+    def _get_soup(self, count=10):
+        try:
+            proxy_response = requests.get(self.url)
+            return BeautifulSoup(proxy_response.content, "html.parser")
+        except requests.exceptions.ConnectionError:
+            logger.info("Retry opening proxy website.")
+            if count >= 0:
+                return self._get_soup(count-1)
+            else:
+                raise Exception("Failed to open proxy website")
 
     @staticmethod
     def _get_type(type_tag, sep='/'):
         return [t.lower() for t in type_tag.string.split(sep) if t.lower() != 'socks4']
 
-    # TODO: improve generating model
+    # TODO: improve scheduling model
     @staticmethod
     def _get_idle_time(mean=0, deviation=2.5, maximum=6):
         guess = min(maximum, abs(random.gauss(mean, deviation)))
@@ -83,41 +84,32 @@ class LikeRobot(object):
         return self._get_proxy_list()
 
     def _like(self):
-        while 1:
-            try:
-                content = self._like_response().content
-                response = json.loads(content)
+        try:
+            content = self._like_response().content
+            response = json.loads(content)
+            if response['Status'] == 1:
+                logger.info("Successfully liked the link. Num of Like: {0}".format(response['Count']))
+                if response['Count'] > 10000:
+                    logger.info("Unexpected number. Respnse: {0}".format(content))
+            else:
+                logger.info("Failed to like. Response: {0}".format(content))
 
-                if response['Status'] == 1:
-                    logger.info("Successfully liked the link. Num of Like: {0}".format(response['Count']))
-                    if response['Count'] > 10000:
-                        logger.info("Unexpected number. Respnse: {0}".format(content))
-                else:
-                    logger.info("Failed to like. Response: {0}".format(content))
-
-                break
-
-            except requests.exceptions.ConnectionError:
-                logger.info("Failed to connect proxy.")
-                continue
-
-            except Exception:
-                raise
+        except requests.exceptions.ConnectionError:
+            logger.info("Failed to connect proxy.")
+            self._like()
+        except Exception:
+            raise
 
     def like(self):
-        while 1:
-            try:
-                self.proxy_list = self.get_proxy_list()
-                self._like()
+        try:
+            self.proxy_list = self.get_proxy_list()
+            self._like()
 
-                break
-
-            # running out of proxies
-            except IndexError:
-                continue
-
-            except Exception:
-                raise
+        # running out of proxies
+        except IndexError:
+            self.like()
+        except Exception:
+            raise
 
     def run(self, init=False):
         if init:
@@ -130,7 +122,7 @@ class LikeRobot(object):
 
             except Exception as e:
                 logger.info("Error -- Type: {0} ; Message: {1}".format(type(e), e))
-                break
+                # break
 
             self.idle = self._get_idle_time()
 
@@ -141,12 +133,12 @@ class LikeRobot(object):
             logger.info("Next action will be taken in {0}h {1}m {2}s\n\n".format(h, m, s))
 
 
-class GoubanjiaProxy(LikeRobot):
+class GoubanjiaProxyRobot(LikeRobot):
 
     URL = "http://proxy.goubanjia.com"
 
     def __init__(self):
-        super(GoubanjiaProxy, self).__init__()
+        super(GoubanjiaProxyRobot, self).__init__()
         self.url = self.URL
         self.hidden_pattern = re.compile(".*display.*none.*")
 
@@ -181,12 +173,12 @@ class GoubanjiaProxy(LikeRobot):
         return proxy_list
 
 
-class MimvpProxy(LikeRobot):
+class MimvpProxyRobot(LikeRobot):
 
     URL = "http://proxy.mimvp.com/index.php"
 
     def __init__(self):
-        super(MimvpProxy, self).__init__()
+        super(MimvpProxyRobot, self).__init__()
         self.img_pattern = re.compile(".*port=(.*)")
         self.url = self.URL
 
@@ -216,9 +208,9 @@ if __name__ == '__main__':
 
     if len(sys.argv) > 1:
         if sys.argv[1] == '2':
-            gbj = GoubanjiaProxy()
+            gbj = GoubanjiaProxyRobot()
             gbj.run()
 
-    mimvp = MimvpProxy()
+    mimvp = MimvpProxyRobot()
     mimvp.run()
 
