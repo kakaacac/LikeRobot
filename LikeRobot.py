@@ -12,6 +12,7 @@ import json
 from bs4 import BeautifulSoup
 
 from logger import logger
+import config
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko",
@@ -57,12 +58,12 @@ class LikeRobot(object):
 
     # TODO: improve scheduling model
     @staticmethod
-    def _get_idle_time(mean=0, deviation=2.5, maximum=6):
+    def _get_idle_time(mean=config.MEAN, deviation=config.DEVIATION, maximum=config.MAXIMUM):
         guess = min(maximum, abs(random.gauss(mean, deviation)))
         if guess == maximum or guess == 0:
             rd = random.random()
             guess += (-1)**int(rd*10)*rd
-        return int(guess*1800)
+        return int(guess*config.PERIOD)
 
     def _format_proxy(self):
         proxy = self.proxy_list.pop(0)
